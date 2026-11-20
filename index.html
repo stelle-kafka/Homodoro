@@ -41,6 +41,26 @@
     --fg-soft: rgba(0,0,0,0.55);
   }
   html.light, html.light body{ color-scheme: light; }
+
+  /* Registering the theme colours as <color> lets a background change fade every
+     colour (text, rings, lines) together instead of snapping. Browsers without
+     @property simply switch instantly. The fade only runs while html.theme-fade
+     is set (swatch taps), so first paint never animates. */
+  @property --bg{ syntax:'<color>'; inherits:true; initial-value:#20201F; }
+  @property --fg{ syntax:'<color>'; inherits:true; initial-value:#ffffff; }
+  @property --fg-dim{ syntax:'<color>'; inherits:true; initial-value:#6b6b6b; }
+  @property --fg-faint{ syntax:'<color>'; inherits:true; initial-value:#2c2c2c; }
+  @property --fg-soft{ syntax:'<color>'; inherits:true; initial-value:#93939a; }
+  @property --track{ syntax:'<color>'; inherits:true; initial-value:#141414; }
+  @property --accent-a{ syntax:'<color>'; inherits:true; initial-value:#ffffff; }
+  @property --accent-b{ syntax:'<color>'; inherits:true; initial-value:#575757; }
+  @property --hairline{ syntax:'<color>'; inherits:true; initial-value:#1d1d1d; }
+  @property --on-fg{ syntax:'<color>'; inherits:true; initial-value:#000; }
+  :root.theme-fade{
+    transition: --bg .4s ease, --fg .4s ease, --fg-dim .4s ease, --fg-faint .4s ease, --fg-soft .4s ease,
+                --track .4s ease, --accent-a .4s ease, --accent-b .4s ease, --hairline .4s ease, --on-fg .4s ease;
+  }
+  :root.theme-fade #settingsModal{ transition: none; }   /* the variable itself is animating; don't ease twice */
   html.light .lofi-btn .wave path, html.light .lofi-shuffle svg{ opacity:.9; }
   html.light .lofi-btn.active .wave path, html.light .lofi-shuffle.active svg{ opacity:1; }
 
@@ -522,7 +542,7 @@
     touch-action: pan-y;
     padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
   }
-  #settingsModal .modal-panel{ max-width: 300px; margin: auto 0; gap: 26px; }
+  #settingsModal .modal-panel{ max-width: 320px; margin: auto 0; gap: 26px; }
 
   .set-list{ width:100%; display:flex; flex-direction:column; }
   .set-row{
@@ -671,7 +691,7 @@
   .lofi-btn.active .lofi-btn-label{ color:var(--fg); }
   .swatches{
     display:grid; grid-template-columns: repeat(6, 22px); justify-content:space-between; row-gap:16px;
-    padding:16px 2px 18px; border-bottom:1px solid rgba(var(--ink-rgb),0.07);
+    padding:16px 6px 18px; border-bottom:1px solid rgba(var(--ink-rgb),0.07);   /* side room so the active ring (outline + offset = 4px) is not clipped by .swatches-clip */
   }
   .swatches-wrap{ display:grid; grid-template-rows:0fr; transition: grid-template-rows .34s cubic-bezier(.4,0,.2,1); }
   .swatches-wrap.open{ grid-template-rows:1fr; }
@@ -686,7 +706,13 @@
     padding: 0; cursor: pointer;
     background: var(--c);
     border: 1px solid rgba(var(--ink-rgb),0.28);
+    transition: background-color .45s ease, border-color .3s ease;
   }
+  .swatches .swatch:nth-child(6n+2){ transition-delay: .03s, 0s; }
+  .swatches .swatch:nth-child(6n+3){ transition-delay: .06s, 0s; }
+  .swatches .swatch:nth-child(6n+4){ transition-delay: .09s, 0s; }
+  .swatches .swatch:nth-child(6n+5){ transition-delay: .12s, 0s; }
+  .swatches .swatch:nth-child(6n){ transition-delay: .15s, 0s; }
   .swatch.active{ outline: 1px solid var(--fg); outline-offset: 3px; }
 
   .preset-switch{ display:flex; gap: 22px; margin-top: -8px; }
@@ -1393,8 +1419,11 @@
         <div class="modal-value set-value" id="setBeepVal" tabindex="0" aria-label="Beep sound, drag up or down to change, tap to preview">Chime</div>
       </div>
       <button class="set-row" id="setNotify"><span class="set-label">Notify</span><span class="set-val" id="setNotifyVal">ON</span></button>
-      <button class="set-row" id="setBg" aria-expanded="false"><span class="set-label">Background</span><span class="swatch swatch-current" id="bgCurrent"></span></button>
-      <div class="swatches-wrap" id="swatchesWrap"><div class="swatches-clip"><div class="swatches" id="swatches"></div></div></div>
+      <div class="set-row set-row--static" id="setBgRow">
+        <span class="set-label">Background</span>
+        <div class="modal-value set-value" id="setBgVal" tabindex="0" aria-label="Background style, drag up or down to change">Dark</div>
+      </div>
+      <div class="swatches-wrap open" id="swatchesWrap"><div class="swatches-clip"><div class="swatches" id="swatches"></div></div></div>
       <button class="set-row" id="setPresets"><span class="set-label">Presets</span><span class="set-val">EDIT</span></button>
       <button class="set-row" id="setAwake"><span class="set-label">Keep awake</span><span class="set-val" id="setAwakeVal">ON</span></button>
       <button class="set-row" id="setFocus"><span class="set-label">Focus mode</span><span class="set-val off" id="setFocusVal">OFF</span></button>
@@ -1506,13 +1535,36 @@
   const PRESET_TIMES_KEY = 'pomodoroPresetTimes';
   const BG_CHOICES = [
     '#20201F', '#000000', '#0E1620', '#10201A', '#241518', '#1B1626',   // dark
-    '#F5F5F3', '#F4D6DC', '#F7E0C9', '#F3EBC4', '#D6EBDD', '#D3E4F3'    // light: white, pink, peach, butter, mint, sky
+    '#2E2E2C', '#231B14', '#0F2327', '#1E2010', '#2B1426', '#101A33',   // dark: graphite, espresso, teal, olive, plum, indigo
+    '#F5F5F3', '#F4D6DC', '#F7E0C9', '#F3EBC4', '#D6EBDD', '#D3E4F3',   // light: white, pink, peach, butter, mint, sky
+    '#E3DCF3', '#F6D2C6', '#E3EBC6', '#CDEBEA', '#EADFCE', '#E3E3E1',   // light: lavender, coral, lime, aqua, sand, grey
+    '#DC2626', '#C2410C', '#DB2777', '#C026D3', '#7C3AED', '#4F46E5',   // vivid: red, orange, pink, fuchsia, violet, indigo
+    '#2563EB', '#0E7490', '#0F766E', '#15803D', '#4D7C0F', '#E11D48',   // vivid: blue, cyan, teal, green, lime, rose
+    '#5F7A61', '#A15C6B', '#A5583F', '#4F6D8F', '#7A6B94', '#7D6B5D',   // muted: sage, dusty rose, terracotta, dusty blue, mauve, taupe
+    '#8A7434', '#6B7A4B', '#4E7A7B', '#5A6577', '#7B4B6A', '#6E5143'    // muted: mustard, moss, blue-grey teal, slate, plum, cocoa
   ];
+  // Background styles in the order they are paged through. `block` = which group of 12 in BG_CHOICES (2 rows of 6).
+  const BG_STYLES = [
+    { id: 'dark',   label: 'Dark',   block: 0 },
+    { id: 'muted',  label: 'Muted',  block: 3 },
+    { id: 'vivid',  label: 'Vivid',  block: 2 },
+    { id: 'pastel', label: 'Pastel', block: 1 }
+  ];
+  const BG_PER_STYLE = 12;
+  const bgStyleOf = color => Math.max(0, BG_STYLES.findIndex(st => st.block === Math.floor(BG_CHOICES.indexOf(color) / BG_PER_STYLE)));
+  // Vivid backgrounds keep every piece of text, ring and line white (all picked dark enough for white to stay readable).
+  const BG_VIVID = new Set(['#DC2626', '#C2410C', '#DB2777', '#C026D3', '#7C3AED', '#4F46E5',
+                            '#2563EB', '#0E7490', '#0F766E', '#15803D', '#4D7C0F', '#E11D48',
+                            '#5F7A61', '#A15C6B', '#A5583F', '#4F6D8F', '#7A6B94', '#7D6B5D',
+                            '#8A7434', '#6B7A4B', '#4E7A7B', '#5A6577', '#7B4B6A', '#6E5143']);   // muted tones also use white ink
   // Pastel backgrounds draw text, rings and lines in a deeper shade of the same hue.
   const BG_INK = {
     '#F5F5F3': '#1C1C1E', '#F4D6DC': '#A8324F', '#F7E0C9': '#9C4519',
-    '#F3EBC4': '#756410', '#D6EBDD': '#1F6B47', '#D3E4F3': '#25588F'
+    '#F3EBC4': '#756410', '#D6EBDD': '#1F6B47', '#D3E4F3': '#25588F',
+    '#E3DCF3': '#5A3E9E', '#F6D2C6': '#B0391F', '#E3EBC6': '#52701A',
+    '#CDEBEA': '#1A6A69', '#EADFCE': '#765528', '#E3E3E1': '#3A3A3C'
   };
+  BG_VIVID.forEach(c => { BG_INK[c] = '#FFFFFF'; });
   const BEEP_STYLES = [
     { id: 'chime',   label: 'Chime' },
     { id: 'soft',    label: 'Soft' },
@@ -1563,9 +1615,10 @@
       const a = (x) => 'rgba(' + rgb + ', ' + x + ')';
       const set = (k, v) => root.style.setProperty(k, v);
       set('--fg', ink);            set('--accent-a', ink);
-      set('--fg-dim', a(0.55));    set('--fg-faint', a(0.16));  set('--fg-soft', a(0.68));
+      const v = BG_VIVID.has(color);   // vivid: push the white tints up so secondary text still reads as white
+      set('--fg-dim', a(v ? 0.78 : 0.55));    set('--fg-faint', a(v ? 0.26 : 0.16));  set('--fg-soft', a(v ? 0.88 : 0.68));
       set('--ink-rgb', rgb);       set('--on-fg', color);
-      set('--track', a(0.09));     set('--accent-b', a(0.38));  set('--hairline', a(0.12));
+      set('--track', a(v ? 0.18 : 0.09));     set('--accent-b', a(v ? 0.55 : 0.38));  set('--hairline', a(v ? 0.22 : 0.12));
       set('--scrim', 'rgba(' + r + ', ' + g + ', ' + b + ', 0.94)');
     } else {
       themeVars.forEach(k => root.style.removeProperty(k));
@@ -1668,6 +1721,7 @@
   // plain Notification API only. Permission is requested from start(), which
   // always runs inside a user gesture. The timer works without notifications.
   let lastNotifyKey = '';
+  let notifyCtorFailed = false;
   function ensureNotificationPermission(){
     try{
       if(!appSettings.notify) return;
@@ -1686,7 +1740,7 @@
       if(key === lastNotifyKey) return;       // never fire the same notice twice in a row
       lastNotifyKey = key;
       new Notification(title, { body, tag: 'pomodoro-phase', renotify: true });
-    }catch(e){ }
+    }catch(e){ notifyCtorFailed = true; }   // e.g. Android Chrome / iOS web apps: page-level Notification() is refused
   }
 
   let audioCtx = null;
@@ -1785,7 +1839,7 @@
     const el = new Audio();
     el.preload = 'auto';
     el.setAttribute('playsinline', '');
-    let tracks = [], order = [], pos = 0, url = null;
+    let tracks = [], order = [], pos = 0, url = null, curId = null;   // curId: id of the track loaded into <audio>
     let gain = null, analyser = null, wired = false, wanted = false, ducked = false, lastWant = false;
     let fadeTimer = null, duckTimer = null, stopCb = null;
 
@@ -1800,9 +1854,8 @@
       const now = Date.now();
       if(!force && now - lastStateSave < 3000) return;
       lastStateSave = now;
-      const t = tracks[order[pos]];
-      if(!t || typeof t.id !== 'number') return;
-      try{ localStorage.setItem(STATE_KEY, JSON.stringify({ id: t.id, t: Math.floor(el.currentTime || 0) })); }catch(e){ }
+      if(typeof curId !== 'number') return;     // nothing loaded yet (or a temp track): keep the stored position
+      try{ localStorage.setItem(STATE_KEY, JSON.stringify({ id: curId, t: Math.floor(el.currentTime || 0) })); }catch(e){ }
     }
 
 
@@ -1851,6 +1904,7 @@
       const t = tracks[order[pos]];
       if(url) URL.revokeObjectURL(url);
       url = URL.createObjectURL(t.blob);
+      curId = t.id;
       el.src = url;
       el.loop = tracks.length === 1;
       if(resume && resume.id === t.id){
@@ -2120,90 +2174,314 @@
     return {};
   }
   // A work phase that ran to its end counts as one session (credited to the day it ended).
-  function logWork(sec, endMs){
+  // Credits are collected in memory during a sync and written to storage once (flushCredits),
+  // so a catch-up over many phases never re-parses / re-writes the stats thousands of times.
+  function addCredit(map, sec, endMs){
+    const k = dayKey(endMs || Date.now());
+    const d = map[k] || (map[k] = { n: 0, sec: 0 });
+    d.n += 1; d.sec += Math.round(sec);
+  }
+  function flushCredits(map){
+    const keys = Object.keys(map);
+    if(!keys.length) return;
     try{
-      const all = loadStats(), k = dayKey(endMs || Date.now());
-      const d = all[k] || { n: 0, sec: 0 };
-      d.n += 1; d.sec += Math.round(sec);
-      all[k] = d;
+      const all = loadStats();
+      keys.forEach(k => {
+        const d = all[k] || { n: 0, sec: 0 };
+        d.n += map[k].n; d.sec += map[k].sec;
+        all[k] = d;
+      });
       localStorage.setItem(STATS_KEY, JSON.stringify(all));
     }catch(e){ }
   }
 
-  function switchMode(idx, quiet){
-    const s = states[idx];
-    const endedWork = ((PRESETS[idx].type === 'altloop') ? s.altPhase === 0 : s.mode === 'work') && s.totalSec > 0;
-    if(endedWork) logWork(s.totalSec, s.endTimestamp);
+  // ---- Phase transition: PURE state machine (no clock, no DOM, no sound, no storage) ----
+  // Mutates `st` (a timer state or a plain copy of one) to the next phase and reports what happened.
+  function advancePhase(idx, st){
     const preset = PRESETS[idx];
+    const endedWork = ((preset.type === 'altloop') ? st.altPhase === 0 : st.mode === 'work') && st.totalSec > 0;
+    const workSec = st.totalSec;
     const lb = longBreakFor(idx);
-    const longDue = () => lb.on && lb.sec > 0 && s.sessions % lb.every === 0;
+    const longDue = () => lb.on && lb.sec > 0 && st.sessions % lb.every === 0;
     let msg;
     if(preset.type === 'altloop'){
-      if(s.altPhase === 0){
-        // a work segment just finished
-        s.sessions += 1;
-        s.isLong = longDue();
-        if(s.isLong){
-          s.altPhase = 1;
-          s.totalSec = lb.sec;
+      if(st.altPhase === 0){
+        st.sessions += 1;
+        st.isLong = longDue();
+        if(st.isLong){
+          st.altPhase = 1;
+          st.totalSec = lb.sec;
           msg = ['Work complete', 'Starting long break'];
         } else if(preset.durations[1] <= 0){
-          s.cycles += 1;
-          s.totalSec = preset.durations[0];
-          msg = ['Work complete', 'Round ' + s.cycles + ' complete'];
+          st.cycles += 1;
+          st.totalSec = preset.durations[0];
+          msg = ['Work complete', 'Round ' + st.cycles + ' complete'];
         } else {
-          s.altPhase = 1;
-          s.totalSec = preset.durations[1];
-          msg = ['Timer', 'Switched to a ' + formatTime(s.totalSec) + ' segment'];
+          st.altPhase = 1;
+          st.totalSec = preset.durations[1];
+          msg = ['Timer', 'Switched to a ' + formatTime(st.totalSec) + ' segment'];
         }
       } else {
-        const wasLong = s.isLong;
-        s.isLong = false;
-        s.altPhase = 0;
-        s.cycles += 1;
-        s.totalSec = preset.durations[0];
+        const wasLong = st.isLong;
+        st.isLong = false;
+        st.altPhase = 0;
+        st.cycles += 1;
+        st.totalSec = preset.durations[0];
         msg = wasLong
           ? ['Long break complete', 'Resuming work']
-          : ['Timer', 'Switched to a ' + formatTime(s.totalSec) + ' segment (round ' + s.cycles + ' complete)'];
+          : ['Timer', 'Switched to a ' + formatTime(st.totalSec) + ' segment (round ' + st.cycles + ' complete)'];
       }
-    } else if(s.mode === 'work'){
-      s.cycles += 1; s.sessions += 1; s.mode = 'break';
-      s.isLong = longDue();
-      s.totalSec = s.isLong ? lb.sec : preset.brk;
-      msg = ['Work complete', s.isLong ? 'Starting long break' : 'Starting break'];
+    } else if(st.mode === 'work'){
+      st.cycles += 1; st.sessions += 1; st.mode = 'break';
+      st.isLong = longDue();
+      st.totalSec = st.isLong ? lb.sec : preset.brk;
+      msg = ['Work complete', st.isLong ? 'Starting long break' : 'Starting break'];
     } else {
-      s.mode = 'work'; s.isLong = false; s.totalSec = preset.work;
+      st.mode = 'work'; st.isLong = false; st.totalSec = preset.work;
       msg = ['Break complete', 'Resuming work'];
     }
-    if(s.totalSec <= 0) s.totalSec = 1;            // guard: never a zero-length phase
-    s.endTimestamp = (s.endTimestamp !== null ? s.endTimestamp : Date.now()) + s.totalSec * 1000;
-    s.remaining = s.totalSec;
-    s.lastShownSec = null;
-    if(!quiet){
-      notify(msg[0], msg[1]);
-      playBeep();
-      flashRing(idx);
-      s.displayRemaining = s.totalSec;
-    }
-    if(idx === presetIndex) updateControls();
-    return msg;
+    if(st.totalSec <= 0) st.totalSec = 1;            // guard: never a zero-length phase
+    st.remaining = st.totalSec;
+    return { endedWork, workSec, msg };
   }
 
-  // Re-sync every running timer to the wall clock. Handles any number of
-  // elapsed phases (long background / lock screen) in chronological order,
-  // alerting once for the final transition only.
-  function syncTimers(){
+  // A "recurrence point" is a phase start from which the whole sequence repeats identically
+  // (primary phase, not a long break, long-break counter back at 0). Used to skip whole
+  // periods arithmetically instead of stepping through every phase of a huge gap.
+  function longEvery(idx){
+    const lb = longBreakFor(idx);
+    return (lb.on && lb.sec > 0) ? Math.max(1, lb.every | 0) : 1;
+  }
+  function isRecurrencePoint(idx, st){
+    const primary = PRESETS[idx].type === 'cycle' ? st.mode === 'work' : st.altPhase === 0;
+    return primary && !st.isLong && (st.sessions % longEvery(idx) === 0);
+  }
+  // Length (ms) and counter growth of one full period, measured on a copy. null = not found.
+  function measurePeriod(idx, st){
+    const c = { mode: st.mode, altPhase: st.altPhase, totalSec: st.totalSec, remaining: st.totalSec,
+                cycles: st.cycles, sessions: st.sessions, isLong: st.isLong };
+    const c0 = c.cycles, s0 = c.sessions;
+    let ms = 0, phases = 0;
+    const limit = 8 * longEvery(idx) + 8;
+    do {
+      ms += c.totalSec * 1000;
+      advancePhase(idx, c);
+      phases++;
+    } while(!isRecurrencePoint(idx, c) && phases < limit);
+    if(!isRecurrencePoint(idx, c) || ms <= 0) return null;
+    return { ms, phases, dCycles: c.cycles - c0, dSessions: c.sessions - s0 };
+  }
+
+  const CATCHUP_MAX_STEPS = 20000;   // exact phase-by-phase processing (in memory, cheap); beyond this: skip whole periods
+
+  // Bring ONE running timer up to `now`: process every phase boundary that has passed, in order.
+  // The next phase always starts at the previous phase's real end time, so no time is lost or invented.
+  function catchUp(idx, now){
+    const s = states[idx];
+    const credits = {};
+    let exact = 0, skipped = 0, last = null, capped = false, halted = false, fastForwarded = false;
+    const alignLimit = 8 * longEvery(idx) + 16;
+    while(now >= s.endTimestamp){
+      if(exact >= CATCHUP_MAX_STEPS && !fastForwarded){
+        // Huge gap: align to a recurrence point, then jump whole periods arithmetically.
+        // Phases skipped this way are NOT credited to the stats (nobody can say they were worked).
+        capped = true;
+        let guard = 0;
+        while(now >= s.endTimestamp && !isRecurrencePoint(idx, s) && guard++ < alignLimit){
+          const r = advancePhase(idx, s);
+          s.endTimestamp += s.totalSec * 1000;
+          last = r.msg; skipped++;
+        }
+        if(now < s.endTimestamp) break;
+        const per = isRecurrencePoint(idx, s) ? measurePeriod(idx, s) : null;
+        if(!per){ halted = true; break; }
+        const k = Math.floor((now - s.endTimestamp) / per.ms);
+        if(k > 0){
+          s.endTimestamp += k * per.ms;
+          s.cycles += k * per.dCycles;
+          s.sessions += k * per.dSessions;
+          skipped += k * per.phases;
+        }
+        fastForwarded = true;                    // the remainder (< one period) is stepped normally below
+        continue;
+      }
+      const endedAt = s.endTimestamp;
+      const r = advancePhase(idx, s);
+      if(r.endedWork) addCredit(credits, r.workSec, endedAt);
+      s.endTimestamp += s.totalSec * 1000;
+      last = r.msg; exact++;
+    }
+    if(halted){
+      // Could not resolve the schedule: stop in a clean, well-defined state (work phase, full time, paused).
+      s.running = false; s.endTimestamp = null;
+      s.mode = 'work'; s.altPhase = 0; s.isLong = false;
+      s.totalSec = PRESETS[idx].type === 'cycle' ? PRESETS[idx].work : PRESETS[idx].durations[0];
+    }
+    s.remaining = s.totalSec;
+    s.lastShownSec = null;
+    flushCredits(credits);
+    return { phases: exact + skipped, last, capped, halted };
+  }
+
+  // ---- Clock guard (system-clock changes) ----
+  // The running deadline is a wall-clock time (s.endTimestamp, epoch ms) because that is the only
+  // clock that survives reloads and device sleep. While the page is awake and ticking, the
+  // monotonic clock (performance.now) must advance exactly like the wall clock: if it does not,
+  // the user/OS changed the system time, and the deadline is shifted by that jump so the
+  // remaining time does not change. After sleep / long background (large gap) the monotonic
+  // clock may be frozen, so the wall clock is trusted instead.
+  const CLOCK_GAP_MAX_MS = 5000, CLOCK_JUMP_TOL_MS = 1000;
+  const clockRef = { wall: Date.now(), mono: performance.now() };
+  function guardClock(){
+    const w = Date.now(), m = performance.now();
+    const dW = w - clockRef.wall, dM = m - clockRef.mono;
+    clockRef.wall = w; clockRef.mono = m;
+    if(dM < 0 || dM > CLOCK_GAP_MAX_MS) return false;
+    const jump = dW - dM;
+    if(Math.abs(jump) <= CLOCK_JUMP_TOL_MS) return false;
+    states.forEach(s => { if(s.running && s.endTimestamp !== null) s.endTimestamp += jump; });
+    persistTimers();
+    return true;
+  }
+
+  // ---- Sync: the only place that moves running timers across phase boundaries ----
+  let syncing = false, deadlineTimer = null;
+  function syncTimers(opts){
+    if(syncing) return null;                      // re-entrancy guard: a transition can never run twice
+    syncing = true;
+    const quiet = !!(opts && opts.quiet);
+    let report = null;
+    try{
+      guardClock();
+      const now = Date.now();
+      for(let i = 0; i < PRESETS.length; i++){
+        const s = states[i];
+        if(!s.running || s.endTimestamp === null || now < s.endTimestamp) continue;
+        const r = catchUp(i, now);
+        s.displayRemaining = liveRemaining(s);
+        if(i === presetIndex) updateControls();
+        report = report || { phases: 0 };
+        report.phases += r.phases;
+        report.capped = report.capped || r.capped;
+        report.halted = report.halted || r.halted;
+        if(!quiet && r.last){
+          // one alert for the final transition only (no burst of notifications after a long gap)
+          notify(r.last[0], r.last[1]); playBeep(); flashRing(i);
+        }
+      }
+      if(report){
+        persistTimers();
+        if(report.halted) showNotice('Timer stopped after a very long gap and was reset.');
+        else if(report.capped) showNotice('Away for a long time: the timer caught up to the current phase.');
+        else if(report.phases > 1) showNotice(report.phases + ' phases passed while you were away.');
+      }
+    } finally { syncing = false; }
+    armDeadline();
+    return report;
+  }
+
+  // Wake up exactly at the next deadline (the 1 s interval and rAF can be throttled in the background).
+  function armDeadline(){
+    clearTimeout(deadlineTimer); deadlineTimer = null;
+    let next = null;
+    for(const s of states){ if(s.running && s.endTimestamp !== null && (next === null || s.endTimestamp < next)) next = s.endTimestamp; }
+    if(next === null) return;
+    deadlineTimer = setTimeout(() => syncTimers(), Math.min(2147483000, Math.max(0, next - Date.now()) + 15));
+  }
+
+  // ---- Persistence (independent of display) ----
+  // Saved: per preset the full machine state. Running => endTimestamp (+ remaining as of save time);
+  // paused/idle => remaining. Restored by restoreTimers().
+  const TIMER_STATE_KEY = 'pomodoroTimerState', TIMER_STATE_VER = 1;
+  function cfgSig(idx){
+    const p = PRESETS[idx];
+    return p.type === 'cycle' ? [p.work, p.brk] : [p.durations[0], p.durations[1]];
+  }
+  function persistTimers(){
+    try{
+      const timers = states.map((s, i) => {
+        const resetting = !!s.resetAnimId;        // a reset animation is only visual: its target is the full time
+        const rem = resetting ? s.totalSec : liveRemaining(s);
+        return { cfg: cfgSig(i), mode: s.mode, altPhase: s.altPhase, totalSec: s.totalSec, remaining: rem,
+                 running: !!s.running && s.endTimestamp !== null, endTimestamp: s.running ? s.endTimestamp : null,
+                 cycles: s.cycles, sessions: s.sessions, isLong: !!s.isLong };
+      });
+      localStorage.setItem(TIMER_STATE_KEY, JSON.stringify({ v: TIMER_STATE_VER, savedAt: Date.now(), view: presetIndex, timers }));
+    }catch(e){ }
+  }
+  function restoreTimers(){
+    let o = null;
+    try{ o = JSON.parse(localStorage.getItem(TIMER_STATE_KEY)); }catch(e){ return; }
+    if(!o || o.v !== TIMER_STATE_VER || !Array.isArray(o.timers) || o.timers.length !== PRESETS.length) return;
     const now = Date.now();
-    for(let i = 0; i < PRESETS.length; i++){
+    const clockWentBack = Number.isFinite(o.savedAt) && now < o.savedAt - CLOCK_JUMP_TOL_MS;
+    const okInt = (v) => Number.isInteger(v) && v >= 0 && v < 1e9;
+    let runningSeen = false, restoredAny = false;
+    o.timers.forEach((t, i) => {
+      if(!t || JSON.stringify(t.cfg) !== JSON.stringify(cfgSig(i))) return;          // preset times changed: keep fresh state
+      if(!(t.mode === 'work' || t.mode === 'break') || !(t.altPhase === 0 || t.altPhase === 1)) return;
+      if(!Number.isFinite(t.totalSec) || t.totalSec < 1 || t.totalSec > 86400) return;
+      if(!Number.isFinite(t.remaining) || t.remaining < 0 || t.remaining > t.totalSec * 2 + 1) return;
+      if(!okInt(t.cycles) || !okInt(t.sessions)) return;
       const s = states[i];
-      if(!s.running || s.endTimestamp === null || now < s.endTimestamp) continue;
-      let steps = 0, last = null;
-      while(now >= s.endTimestamp && steps < 5000){
-        last = switchMode(i, true); steps++;
+      s.mode = t.mode; s.altPhase = t.altPhase; s.totalSec = t.totalSec; s.remaining = t.remaining;
+      s.cycles = t.cycles; s.sessions = t.sessions; s.isLong = !!t.isLong;
+      s.running = false; s.endTimestamp = null;
+      if(t.running && Number.isFinite(t.endTimestamp) && !runningSeen){
+        runningSeen = true;                      // the app runs at most one timer
+        s.running = true;
+        // System clock moved back since the save: assume no time passed rather than gaining time.
+        s.endTimestamp = clockWentBack ? now + t.remaining * 1000 : t.endTimestamp;
       }
       s.displayRemaining = liveRemaining(s);
-      if(last){ notify(last[0], last[1]); playBeep(); flashRing(i); }
-    }
+      s.lastShownSec = null;
+      restoredAny = true;
+    });
+    if(!restoredAny) return;
+    if(Number.isInteger(o.view) && o.view >= 0 && o.view < PRESETS.length) presetIndex = o.view;
+    const r = syncTimers({ quiet: true });       // phases that ended while the page was closed: applied silently, once
+    PRESETS.forEach((_, i) => { render(i, liveRemaining(states[i]), true); });
+    updateControls();
+    persistTimers();
+    return r;
+  }
+
+  let noticeTimer = null;
+  function showNotice(text){
+    try{
+      if(document.hidden) return;
+      let el = document.getElementById('timerNotice');
+      if(!el){
+        el = document.createElement('div');
+        el.id = 'timerNotice';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);'
+          + 'max-width:86vw;padding:10px 16px;border-radius:14px;font-family:inherit;font-size:13px;line-height:1.4;text-align:center;'
+          + 'background:var(--scrim,rgba(0,0,0,.88));color:var(--fg,#fff);border:1px solid var(--hairline,rgba(255,255,255,.15));'
+          + 'z-index:9999;pointer-events:none;opacity:0;transition:opacity .25s';
+        document.body.appendChild(el);
+      }
+      el.textContent = text;
+      void el.offsetWidth;
+      el.style.opacity = '1';
+      clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => { el.style.opacity = '0'; }, 5000);
+    }catch(e){ }
+  }
+
+  // The browser cannot wake a page that the OS has suspended. Say so, once, instead of pretending.
+  let bgWarned = false;
+  function warnBackgroundLimits(){
+    if(bgWarned || !appSettings.notify) return;
+    const unsupported = !('Notification' in window);
+    const denied = !unsupported && Notification.permission === 'denied';
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    let msg = null;
+    if(unsupported)            msg = "This browser can't show alerts while the page is in the background. Keep it open.";
+    else if(denied)            msg = 'Notifications are blocked: phase changes in the background show when you return.';
+    else if(ios)               msg = "On iOS, alerts can't fire while the app is in the background or the screen is locked. Keep it open.";
+    else if(notifyCtorFailed)  msg = "This browser can't show these alerts from the page. Keep the app open for end-of-phase alerts.";
+    if(msg){ bgWarned = true; showNotice(msg); }
   }
 
   const RING_EASE_TAU_MS = 260;
@@ -2239,18 +2517,26 @@
   document.addEventListener('visibilitychange', resyncOnReturn);
   window.addEventListener('pageshow', resyncOnReturn);
   window.addEventListener('focus', resyncOnReturn);
+  // Save when the page is hidden / leaving (the deadline is what matters, so no per-second saves are needed).
+  document.addEventListener('visibilitychange', () => { if(document.hidden){ syncTimers(); persistTimers(); } });
+  window.addEventListener('pagehide', () => { persistTimers(); });
 
   function start(){
     const s = states[presetIndex];
+    if(s.resetAnimId) s.remaining = s.totalSec;   // a reset is still animating: it ends at the full time
     cancelResetAnim(presetIndex);
+    // One timer runs at a time, but every preset keeps its own state: starting this one only
+    // PAUSES another running preset (its remaining time, phase and counters are kept).
     states.forEach((other, i) => {
-      if(i !== presetIndex && (other.running || other.remaining < other.totalSec
-          || other.mode !== 'work' || other.altPhase !== 0 || other.cycles > 0 || other.sessions > 0)){
-        states[i] = makeState(i);
-        render(i, states[i].remaining, true);
+      if(i !== presetIndex && other.running){
+        other.remaining = liveRemaining(other);
+        other.running = false;
+        other.endTimestamp = null;
+        render(i, other.remaining, true);
       }
     });
     ensureNotificationPermission();
+    warnBackgroundLimits();
     getAudioCtx();
     s.running = true;
     if(s.remaining <= 0){
@@ -2261,6 +2547,8 @@
     render(presetIndex, s.remaining, true);
     updateControls();
     lofi.sync();
+    persistTimers();
+    armDeadline();
   }
 
   function pause(){
@@ -2271,6 +2559,8 @@
     render(presetIndex, s.remaining, true);
     updateControls();
     lofi.sync();
+    persistTimers();
+    armDeadline();
   }
 
   function cancelResetAnim(idx){
@@ -2295,6 +2585,7 @@
     s.sessions = 0;
     s.isLong = false;
     s.totalSec = targetTotal;
+    armDeadline();
 
     const startRemaining = Math.max(0, Math.floor(s.remaining));
     const gap = targetTotal - startRemaining;
@@ -2302,6 +2593,7 @@
       s.remaining = targetTotal;
       s.lastShownSec = null;
       if(idx === presetIndex) updateControls();
+      persistTimers();
       return;
     }
 
@@ -2321,6 +2613,7 @@
       s.resetAnimId = requestAnimationFrame(step);
     }
     s.resetAnimId = requestAnimationFrame(step);
+    persistTimers();                          // resetAnimId is set now, so the saved value is the full time, not an animation frame
   }
 
   function reset(){
@@ -2373,6 +2666,8 @@
       s.endTimestamp = Date.now() + s.remaining * 1000;
     }
     if(idx === presetIndex) updateControls();
+    persistTimers();
+    armDeadline();
     return true;
   }
 
@@ -2589,6 +2884,7 @@
 
   function baseX(){ return -presetIndex * vw; }
 
+  restoreTimers();       // bring back the saved timer state (running => recomputed from its deadline) before first layout
   track.style.transform = `translateX(${baseX()}px)`;
   updatePageVisuals(baseX());
   moveIndicator();
@@ -2625,10 +2921,11 @@
   function viewPreset(target){
     presetIndex = target;
     const s = states[presetIndex];
-    const remFloat = s.running ? Math.max(0, (s.endTimestamp - Date.now()) / 1000) : s.remaining;
+    const remFloat = liveRemaining(s);
     render(presetIndex, remFloat, true);
     updateControls();
     moveIndicator();
+    persistTimers();
   }
 
   function goToPreset(target){
@@ -2932,6 +3229,8 @@
     states[0] = makeState(0);
     render(0, states[0].remaining, true);
     if(presetIndex === 0) updateControls();
+    persistTimers();
+    armDeadline();
     closeCustomModal();
   });
 
@@ -3082,11 +3381,24 @@
       });
       g.circ = TAU * g.R;
       g.orbitR = g.R;
+      orbitTrack.style.strokeWidth = ''; orbitProg.style.strokeWidth = '';   // back to the CSS width / colour / opacity
+      orbitProg.style.stroke = ''; orbitTrack.style.opacity = ''; orbitProg.style.opacity = '';
       g.r1 = Math.max(1, startPauseBtn.offsetWidth * 0.72 / 2 - 0.5);   // final (gear-size) button radius, to its border's centre line
       orbitProg.setAttribute('stroke-dasharray', g.circ.toFixed(2));
       orbitProg.setAttribute('stroke-dashoffset', g.circ.toFixed(2));
       orbit.classList.remove('done', 'ccw');
       orbit.classList.add('on');
+    }
+    // The traced line thins out as the circle shrinks, ending at the button's own (scaled) 1px border,
+    // so the two lines overlap as one instead of looking doubled / thick.
+    function setOrbitW(r, gg){
+      const w0 = 1.1, w1 = GEAR_SCALE * 1;
+      const k = Math.min(1, Math.max(0, (gg.R - r) / Math.max(1e-6, gg.R - gg.r1)));
+      const w = (w0 + (w1 - w0) * k).toFixed(3);
+      orbitTrack.style.strokeWidth = w;
+      orbitProg.style.strokeWidth = w;
+      // Colour follows too: from the bright progress colour to exactly the button's border colour (ink @ 0.7).
+      orbitProg.style.stroke = k > 0 ? 'color-mix(in srgb, rgba(var(--ink-rgb),0.7) ' + (k * 100).toFixed(1) + '%, var(--fg))' : '';
     }
     function updateOrbit(p){
       orbitProg.setAttribute('stroke-dashoffset', (g.circ * (1 - p)).toFixed(2));
@@ -3094,6 +3406,7 @@
     // Resize the traced circle (concentric with the pivot). A finished lap stays fully drawn.
     function setOrbitR(r){
       g.orbitR = r;
+      setOrbitW(r, g);
       orbitTrack.setAttribute('r', r.toFixed(2));
       orbitProg.setAttribute('r', r.toFixed(2));
       orbitProg.setAttribute('stroke-dasharray', (TAU * r).toFixed(2));
@@ -3114,6 +3427,11 @@
       function frame(now){
         const t = Math.min(1, (now - t0) / D);
         const r = r0 + (r1 - r0) * ease(t);
+        setOrbitW(r, gg);
+        // Same colour as the button's border now, so fade the line out while it lands on it:
+        // two stacked translucent lines would otherwise look brighter, then dim when this one disappears.
+        const fo = (1 - ease(t)).toFixed(3);
+        orbitTrack.style.opacity = fo; orbitProg.style.opacity = fo;
         orbitTrack.setAttribute('r', r.toFixed(2));
         orbitProg.setAttribute('r', r.toFixed(2));
         const circ = (TAU * r).toFixed(2);
@@ -4379,9 +4697,7 @@
   const setNotifyBtn     = document.getElementById('setNotify');
   const setNotifyVal     = document.getElementById('setNotifyVal');
   const swatchesEl       = document.getElementById('swatches');
-  const setBgBtn         = document.getElementById('setBg');
-  const bgCurrentEl      = document.getElementById('bgCurrent');
-  const swatchesWrap     = document.getElementById('swatchesWrap');
+  const setBgVal         = document.getElementById('setBgVal');
   const settingsPanel    = settingsModal.querySelector('.modal-panel');
   const setPresetsBtn    = document.getElementById('setPresets');
 
@@ -4408,7 +4724,6 @@
     swatchesEl.querySelectorAll('.swatch').forEach(sw => {
       sw.classList.toggle('active', sw.dataset.color === appSettings.bg);
     });
-    bgCurrentEl.style.setProperty('--c', appSettings.bg);
   }
 
   // Volume: same drag-up/down number control as the rest of the app (step 5).
@@ -4642,7 +4957,11 @@
     updateLofiFill();
     lofi.refresh();
   });
-  setLofiTracksBtn.addEventListener('click', () => lofiFileInput.click());
+  let lofiImporting = false;     // one import at a time: concurrent decodes double the memory and break the storage-total check
+  setLofiTracksBtn.addEventListener('click', () => {
+    if(lofiImporting){ showLofiMsgs(['An import is still in progress. Please wait.']); return; }
+    lofiFileInput.click();
+  });
 
   // Only MP3 and FLAC can be imported.
   const LOFI_MIME = { mp3: 'audio/mpeg', flac: 'audio/flac' };
@@ -4660,8 +4979,30 @@
     s.onerror = () => { lameP = null; rej(new Error('lamejs load')); };
     document.head.appendChild(s);
   }));
+  const LOFI_MP3_MAX_SEC = 10 * 60;   // longer audio is not decoded (decoded PCM is ~0.4 MB per second)
+  function probeDuration(blob){
+    return new Promise(res => {
+      const a = new Audio(), u = URL.createObjectURL(blob);
+      let done = false;
+      const fin = v => {
+        if(done) return; done = true; clearTimeout(tm);
+        a.removeAttribute('src'); try{ a.load(); }catch(e){ }
+        URL.revokeObjectURL(u); res(v);
+      };
+      const tm = setTimeout(() => fin(NaN), 4000);
+      a.preload = 'metadata';
+      a.onloadedmetadata = () => fin(a.duration);
+      a.onerror = () => fin(NaN);
+      a.src = u;
+    });
+  }
   async function compressMp3(buf){
     // Returns a smaller Blob, or null when no compression is needed / possible.
+    // Check length / bitrate BEFORE decoding: decoding a long file can exhaust iOS Safari's memory.
+    let dur = await probeDuration(new Blob([buf], { type: 'audio/mpeg' }));
+    if(!Number.isFinite(dur) || dur <= 0) dur = buf.byteLength * 8 / 96000;   // unknown: assume a low 96 kbps (long) as a safe upper bound
+    if(dur > LOFI_MP3_MAX_SEC) return null;
+    if(buf.byteLength * 8 / dur / 1000 <= LOFI_MP3_KBPS * 1.05) return null;
     const lame = await loadLame();
     const AC = window.AudioContext || window.webkitAudioContext;
     const ctx = new AC();
@@ -4670,19 +5011,21 @@
     // Already at or below the target bitrate (small tolerance for VBR/tags): keep as is.
     if(buf.byteLength * 8 / ab.duration / 1000 <= LOFI_MP3_KBPS * 1.05) return null;
     const ch = Math.min(2, ab.numberOfChannels);
-    const toI16 = f32 => {
-      const o = new Int16Array(f32.length);
-      for(let i = 0; i < f32.length; i++){ const v = Math.max(-1, Math.min(1, f32[i])); o[i] = v < 0 ? v * 0x8000 : v * 0x7FFF; }
+    // Convert block by block (no full-length Int16 copies of the whole track).
+    const toI16 = (f32, from, to) => {
+      const o = new Int16Array(to - from);
+      for(let i = from; i < to; i++){ const v = Math.max(-1, Math.min(1, f32[i])); o[i - from] = v < 0 ? v * 0x8000 : v * 0x7FFF; }
       return o;
     };
-    const L = toI16(ab.getChannelData(0));
-    const R = ch === 2 ? toI16(ab.getChannelData(1)) : null;
+    const L = ab.getChannelData(0);
+    const R = ch === 2 ? ab.getChannelData(1) : null;
     const enc = new lame.Mp3Encoder(ch, ab.sampleRate, LOFI_MP3_KBPS);
     const out = [];
     const BLOCK = 1152;
     for(let i = 0, n = 0; i < L.length; i += BLOCK, n++){
-      const d = ch === 2 ? enc.encodeBuffer(L.subarray(i, i + BLOCK), R.subarray(i, i + BLOCK))
-                         : enc.encodeBuffer(L.subarray(i, i + BLOCK));
+      const e = Math.min(L.length, i + BLOCK);
+      const d = ch === 2 ? enc.encodeBuffer(toI16(L, i, e), toI16(R, i, e))
+                         : enc.encodeBuffer(toI16(L, i, e));
       if(d.length) out.push(d);
       if(n % 400 === 399) await new Promise(r => setTimeout(r, 0));   // keep the UI responsive
     }
@@ -4702,6 +5045,9 @@
 
   lofiFileInput.addEventListener('change', async () => {
     const picked = [...lofiFileInput.files];
+    if(lofiImporting){ lofiFileInput.value = ''; return; }
+    lofiImporting = true;
+    try{
     const msgs = [];
     showLofiMsgs(msgs);
     let total = lofi.tracks.reduce((sum, t) => sum + (t.blob ? t.blob.size : 0), 0);
@@ -4751,6 +5097,7 @@
     await lofi.reload();
     refreshLofiUI();
     showLofiMsgs(msgs);
+    } finally { lofiImporting = false; }
   });
   refreshLofiUI();
   lofi.reload().then(refreshLofiUI);
@@ -4771,28 +5118,53 @@
     }
   });
 
-  setBgBtn.addEventListener('click', () => {
-    const open = swatchesWrap.classList.toggle('open');   // tap the label: expand / collapse the colour choices
-    setBgBtn.setAttribute('aria-expanded', String(open));
-  });
-
-  BG_CHOICES.forEach(color => {
+  /* Background: drag the style name up/down (Dark -> Muted -> Vivid -> Pastel, wraps round);
+     the two rows of swatches below show that style's colours and fade to the new ones. */
+  let bgFadeTimer = null;
+  const swatchBtns = [];
+  for(let i = 0; i < BG_PER_STYLE; i++){
     const sw = document.createElement('button');
     sw.className = 'swatch';
-    sw.dataset.color = color;
-    sw.style.setProperty('--c', color);
-    sw.setAttribute('aria-label', 'Background ' + color);
     sw.addEventListener('click', () => {
+      const color = sw.dataset.color;
       appSettings.bg = color;
       saveSettings();
+      const rootEl = document.documentElement;
+      rootEl.classList.add('theme-fade');
+      void rootEl.offsetWidth;          // commit the transition rule before the colours change
       applyTheme();
+      clearTimeout(bgFadeTimer);
+      bgFadeTimer = setTimeout(() => rootEl.classList.remove('theme-fade'), 500);
       refreshSettingsUI();
     });
     swatchesEl.appendChild(sw);
-  });
+    swatchBtns.push(sw);
+  }
+  function showBgStyle(idx){
+    const b = BG_STYLES[idx].block;
+    const colors = BG_CHOICES.slice(b * BG_PER_STYLE, (b + 1) * BG_PER_STYLE);
+    swatchBtns.forEach((sw, i) => {
+      sw.dataset.color = colors[i];
+      sw.style.setProperty('--c', colors[i]);
+      sw.setAttribute('aria-label', BG_STYLES[idx].label + ' ' + colors[i]);
+    });
+    refreshSettingsUI();
+  }
+  const bgStyleField = {
+    value: bgStyleOf(appSettings.bg) * 5, lo: 0, hi: (BG_STYLES.length - 1) * 5,
+    wrap: true,
+    paint(){
+      const idx = Math.round(this.value / 5);
+      setBgVal.textContent = BG_STYLES[idx].label;
+      showBgStyle(idx);
+    }
+  };
+  createDragUnit(setBgVal, bgStyleField, 5);
+  bgStyleField.paint();
 
   function openSettingsModal(){
     document.documentElement.classList.add('modal-locked');
+    bgStyleField.value = bgStyleOf(appSettings.bg) * 5; bgStyleField.paint();
     volumeField.value = appSettings.volume;
     volumeReady = false; volumeField.paint(); volumeReady = true;
     beepField.value = beepIndexOf(appSettings.beep) * 5;
@@ -4806,8 +5178,6 @@
   }
   function closeSettingsModal(){
     settingsModal.hidden = true;
-    swatchesWrap.classList.remove('open');
-    setBgBtn.setAttribute('aria-expanded', 'false');
     clearTimeout(volumePreviewTimer);
     clearTimeout(beepPreviewTimer);
     document.documentElement.classList.remove('modal-locked');
@@ -4843,21 +5213,33 @@
     presetsModal.classList.remove('swapping');
   }
   // Fade the fields out, switch the layout while they are invisible, fade back in (nothing slides).
-  let presetSwapTimer = null;
+  let presetSwapTimer = null, presetSwapApply = null;
+  // Run the pending swap right now (used by Apply so the draft is complete before it is read).
+  function finishPresetSwap(){
+    if(!presetSwapTimer) return;
+    clearTimeout(presetSwapTimer);
+    presetSwapTimer = null;
+    const fn = presetSwapApply; presetSwapApply = null;
+    if(fn) fn();
+    presetLongToggle.textContent = 'Long break \u00b7 ' + (presetLongOn ? 'ON' : 'OFF');
+    presetLongToggle.classList.toggle('on', presetLongOn);
+    presetLongToggle.setAttribute('aria-expanded', String(presetLongOn));
+    presetsModal.classList.toggle('long-on', presetLongOn);
+    void presetsModal.offsetWidth;                  // commit the hidden state so the fade-in actually runs
+    presetsModal.classList.remove('swapping');
+  }
+  // Drop the pending swap without running it (modal closed / reopened: a stale callback must not touch the new draft).
+  function cancelPresetSwap(){
+    clearTimeout(presetSwapTimer);
+    presetSwapTimer = null; presetSwapApply = null;
+    presetsModal.classList.remove('swapping');
+  }
   function presetLongSwap(apply){
     if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){ apply(); paintPresetLong(); return; }
     presetsModal.classList.add('swapping');
     clearTimeout(presetSwapTimer);
-    presetSwapTimer = setTimeout(() => {
-      presetSwapTimer = null;
-      apply();
-      presetLongToggle.textContent = 'Long break \u00b7 ' + (presetLongOn ? 'ON' : 'OFF');
-      presetLongToggle.classList.toggle('on', presetLongOn);
-      presetLongToggle.setAttribute('aria-expanded', String(presetLongOn));
-      presetsModal.classList.toggle('long-on', presetLongOn);
-      void presetsModal.offsetWidth;                  // commit the hidden state so the fade-in actually runs
-      presetsModal.classList.remove('swapping');
-    }, 320);
+    presetSwapApply = apply;
+    presetSwapTimer = setTimeout(finishPresetSwap, 320);
   }
   presetLongToggle.addEventListener('click', () => {
     if(presetSwapTimer) return;
@@ -4901,6 +5283,7 @@
   presetSwitchBtns.forEach(b => b.addEventListener('click', () => selectPresetDraft(+b.dataset.p)));
 
   function openPresetsModal(){
+    cancelPresetSwap();
     presetDraft = {
       1: { work: PRESETS[1].work, brk: PRESETS[1].brk, long: Object.assign({}, PRESETS[1].long) },
       2: { work: PRESETS[2].work, brk: PRESETS[2].brk, long: Object.assign({}, PRESETS[2].long) }
@@ -4915,6 +5298,7 @@
     presetsModal.hidden = false;
   }
   function closePresetsModal(){
+    cancelPresetSwap();
     presetsModal.hidden = true;
     settingsModal.hidden = false;
   }
@@ -4931,6 +5315,7 @@
   }
 
   document.getElementById('presetsApplyBtn').addEventListener('click', () => {
+    finishPresetSwap();
     stashPresetDraft();
     const saved = {};
     [1, 2].forEach(i => {
@@ -4947,6 +5332,8 @@
       if(presetIndex === i) updateControls();
     });
     try{ localStorage.setItem(PRESET_TIMES_KEY, JSON.stringify(saved)); }catch(e){ }
+    persistTimers();
+    armDeadline();
     closePresetsModal();
   });
 
